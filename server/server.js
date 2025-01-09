@@ -3,7 +3,11 @@ import express from "express";
 import mongoose from "mongoose";
 import bcrypt from 'bcrypt'
 import { nanoid } from "nanoid";
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
+import cors from 'cors';
+// import admin from 'firebase-admin'
+// import serviceAccountKey from "./react-blog-webite"
+// import getAuth from 'firebase-admin/auth'
 
 //schemas
 import User from "./Schema/User.js"
@@ -12,10 +16,15 @@ configDotenv();
 const server = express();
 let PORT = process.env.PORT;
 
+// admin.initializeApp({
+//     credential: admin.credential.cert(serviceAccountKey);
+// })
+
 let emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/; // regex for email
 let passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,20}$/; // regex for password
 
 server.use(express.json());
+server.use(cors());
 
 mongoose.connect(process.env.DB_LOCATION , {
     autoIndex:true
@@ -120,6 +129,25 @@ server.post("/signin",(req,res)=>{
    })
 
 })
+
+// server.post("/google-auth" , (req,res) =>{
+
+//     let {access_token} = req.body;
+
+//     getAuth()
+//     .verifyIdToken(access_token)
+//     .then(async(decodedUser)=>{
+
+//         let {email, name , picture} = decodedUser;
+
+//         picture = picture.replace("s96-c" , "s384-c");
+
+//         let user = await user.findOne({"personal_info.email": email})
+//         .select("personal_info.fullname personal_info.fullname")
+
+//     })
+
+// })
 
 server.listen(PORT , ()=>{
     console.log(`listening on port ${PORT}`)

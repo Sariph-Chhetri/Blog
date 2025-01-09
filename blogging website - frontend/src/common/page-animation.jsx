@@ -10,8 +10,8 @@ const AnimationWrapper = ({
 }) => {
   return (
     <AnimatePresence>
-    <motion.div initial={initial} animate={animate} transition={transition} key={keyValue}> 
-      {children} className={className}
+    <motion.div initial={initial} animate={animate} transition={transition} key={keyValue} className={className}> 
+      {children} 
     </motion.div>
     </AnimatePresence>
   );

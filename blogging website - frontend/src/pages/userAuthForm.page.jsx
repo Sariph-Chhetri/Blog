@@ -7,7 +7,7 @@ import {Toaster ,toast} from 'react-hot-toast'
 import axios from 'axios'
 import { storeInSession } from '../common/session'
 import { UserContext } from '../App'
-import { authWithGoogle } from '../common/firebase'
+// import { authWithGoogle } from '../common/firebase'
 
 const UserAuthForm = ({type}) => { 
 

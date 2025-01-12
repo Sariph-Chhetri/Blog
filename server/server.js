@@ -41,9 +41,27 @@ mongoose.connect(process.env.DB_LOCATION , {
 const db = mongoose.connection;
 const bucket = new GridFSBucket(db, { bucketName: 'banners' }); // 'banners' is the name of the GridFS bucket
 
+
 // File upload setup using Multer
 const storage = multer.memoryStorage(); // Store file in memory
 const upload = multer({ storage: storage });
+
+const verifyJWT = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(" ")[1];
+  
+    if (token == null) {
+      return res.status(401).json({ error: "No access token" });
+    }
+
+    jwt.verify(token, process.env.SECRET_ACCESS_KEY, (err, user) => {
+      if (err) {
+        return res.status(403).json({ error: "Access token is invalid" });
+      }
+      req.user = user.id; // Make sure this line is executed and the token is valid
+      next();
+    });
+  }; 
 
 // after user sign up, these data are given access to the user.
 const formatDataToSend = (user)=>{
@@ -55,8 +73,7 @@ return {
     profile_img : user.personal_info.profile_img ,
     username : user.personal_info.username,
     fullname : user.personal_info.fullname
-}
-}  
+}}  
 
 const generateUsername = async (email)=>{
    let username = email.split('@')[0];
@@ -197,14 +214,14 @@ server.get('/uploads/:id', (req, res) => {
     const fileId = new mongoose.Types.ObjectId(req.params.id);
 
     // Check if the file exists in GridFS
-    bucket.find({ _id: fileId }).toArray((err, files) => {
-        console.log(files)
+    bucket.find({ _id:fileId }).toArray((err, files) => {
+       
         if (err || files.length === 0) {
             return res.status(404).json({ error: 'File not found' });
         }
-
-        const fileId = new mongoose.Types.ObjectId(req.params.id);
-        console.log("Requested file ID:", fileId);  // Log fileId to check if it's correctly formed
+        else{
+            console.log("File:" ,files)
+        }
 
         const downloadStream = bucket.openDownloadStream(fileId);
 
@@ -221,6 +238,71 @@ server.get('/uploads/:id', (req, res) => {
             res.status(500).json({ error: 'Error retrieving file' });
         });
     });
+});
+
+server.post('/create-blog', verifyJWT, (req, res) => {
+    const authorId = req.user;
+    let { title, des, banner, tags, content, draft } = req.body;;
+
+    if (!title || !title.length) {
+        console.error("Error: Missing title");
+        return res.status(403).json({ error: "You must provide a title" });
+    }
+
+    if (!draft) {
+        if (!des || des.length > 200) {
+            console.error("Error: Invalid description length");
+            return res.status(403).json({ error: "You must provide a blog description under 200 characters" });
+        }
+        if (!banner || !banner.length) {
+            console.error("Error: Missing banner");
+            return res.status(403).json({ error: "You must provide a blog banner to publish it" });
+        }
+
+        if (!content || !content.blocks || content.blocks.length === 0) {
+            console.error("Error: Missing content or empty content blocks");
+            return res.status(403).json({ error: "You must provide blog content to publish it" });
+        }
+        if (!tags || tags.length === 0 || tags.length > 10) {
+            console.error("Error: Invalid tags count");
+            return res.status(403).json({ error: "You must provide tags to publish it, max 10" });
+        }
+    }
+
+    // Ensure tags are in lowercase
+    tags = tags.map(tag => tag.toLowerCase());
+
+    const blog_id = title.replace(/[^a-zA-Z0-9]/g, ' ').replace(/\s+/g, "-").trim() + nanoid();
+
+    const blog = new Blog({
+        title,
+        des,
+        banner,
+        content,
+        tags,
+        author: authorId,
+        blog_id,
+        draft: Boolean(draft),
+    });
+
+    blog.save()
+        .then(blog => {
+            let incrementVal = draft ? 0 : 1;
+
+            User.findOneAndUpdate(
+                { _id: authorId },
+                { $inc: { "account_info.total_posts": incrementVal }, $push: { "blogs": blog._id } }
+            ).then(() => {
+                return res.status(200).json({ id: blog.blog_id });
+            }).catch((err) => {
+                console.error('Error updating user:', err);
+                return res.status(500).json({ error: "Failed to update user posts count." });
+            });
+        })
+        .catch(err => {
+            console.error('Error saving blog:', err); // Log the exact error message here
+            return res.status(500).json({ error: err.message });
+        });
 });
 
 

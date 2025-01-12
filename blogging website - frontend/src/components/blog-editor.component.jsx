@@ -1,5 +1,5 @@
 import React, { useContext, useEffect,useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import logo from "../imgs/logo.png";
 import AnimationWrapper from "../common/page-animation";
 import defaultBanner from "../imgs/blog banner.png";
@@ -8,9 +8,14 @@ import EditorJS from "@editorjs/editorjs";
 import { tools } from "./tools.component";
 import { Toaster, toast } from "react-hot-toast";
 import axios from "axios";
+import { UserContext } from "../App";
 
 const BlogEditor = () => {
   const {blog,blog: { title, banner, content, tags, des },setBlog,textEditor,setTextEditor,setEditorState,} = useContext(EditorContext);
+
+  let { userAuth: {access_token}} = useContext(UserContext);
+
+  let navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +24,7 @@ const BlogEditor = () => {
     setTextEditor(
       new EditorJS({
         holder: "editorjs",
-        data: "",
+        data: content,
         placeholder: "Write Your Blog Here",
         tools: tools,
       })
@@ -92,6 +97,65 @@ const BlogEditor = () => {
     }
   };
 
+  const handleSaveDraft = (e) =>{
+
+      if(e.target.className.includes('disable')){
+        return ;
+      }
+      
+        if(!title.length){
+          return toast.error("Write blog title before saving as a draft")
+        }
+      
+      
+        let loadingToast = toast.loading("Saving Draft...")
+      
+        e.target.classList.add('disable');
+
+        if(textEditor.isReady){
+          textEditor.save().then(content =>{
+
+            let blogObj = {
+              banner,title,tags,des,content,draft:true
+            }
+
+            axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/create-blog",blogObj, {
+              headers:{
+                'Authorization': `Bearer ${access_token}`
+              }
+            })
+            .then(()=>{
+          
+              e.target.classList.remove('disable');
+              toast.dismiss(loadingToast);
+              toast.success("Blog Saved")
+          
+              setTimeout(()=>{
+          
+               navigate('/')
+          
+              },500)
+          
+            })
+            .catch(({ response }) =>{
+           
+              e.target.classList.remove('disable');
+              toast.dismiss(loadingToast);
+          
+              return toast.error(response.data.error)
+          
+            })
+          
+
+          })
+        }
+      
+       
+      
+        
+      }
+      
+
   return (
     <>
       <nav className="navbar">
@@ -108,7 +172,7 @@ const BlogEditor = () => {
             Publish
           </button>
 
-          <button className="btn-light py-2 ">Save Draft</button>
+          <button onClick={handleSaveDraft} className="btn-light py-2 ">Save Draft</button>
         </div>
       </nav>
       <Toaster />
@@ -138,6 +202,7 @@ const BlogEditor = () => {
           </div>
 
           <textarea
+            defaultValue={title}
             className="text-4xl font-medium w-full h-20 outline-none resize-none mt-10 leading-tight placeholder:opacity-40 "
             placeholder="Blog Title"
             onKeyDown={handleTitleKeyDown}

@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt'
 import { nanoid } from "nanoid";
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
-import { GridFSBucket } from "mongodb";
+import { GridFSBucket , ObjectId ,  MongoClient } from "mongodb";
 import multer from "multer";
 // import admin from 'firebase-admin'
 // import serviceAccountKey from "./react-blog-webite"
@@ -209,36 +209,66 @@ server.post("/upload-banner", upload.single('banner'), (req, res) => {
     });
   });
   
-// Serve uploaded files from GridFS
+// retrieving images from GridFS
 server.get('/uploads/:id', (req, res) => {
     const fileId = new mongoose.Types.ObjectId(req.params.id);
 
-    // Check if the file exists in GridFS
-    bucket.find({ _id:fileId }).toArray((err, files) => {
-       
-        if (err || files.length === 0) {
-            return res.status(404).json({ error: 'File not found' });
-        }
-        else{
-            console.log("File:" ,files)
-        }
+    // Open download stream from the bucket (before checking files)
+    const downloadStream = bucket.openDownloadStream(fileId);
 
-        const downloadStream = bucket.openDownloadStream(fileId);
+    // Handle any errors in case the file does not exist
+    downloadStream.on('error', (err) => {
+        console.error('Error while downloading file:', err);  // Detailed error logging
+        return res.status(404).json({ error: 'File not found' });  // Return file not found if error
+    });
 
-        downloadStream.on('data', (chunk) => {
-            res.write(chunk);
-        });
+    // Set the appropriate content type for the file
+    downloadStream.on('file', (file) => {
+        res.set('Content-Type', file.contentType);  // Ensure the correct content type is sent
+    });
 
-        downloadStream.on('end', () => {
-            res.end();
-        });
+    // Pipe the download stream to the response
+    downloadStream.pipe(res);
 
-        downloadStream.on('error', (err) => {
-            console.error('Error while downloading file:', err);  // Add detailed error logging
-            res.status(500).json({ error: 'Error retrieving file' });
-        });
+    // The 'end' event should be handled by the pipe, but just in case, you can handle it
+    downloadStream.on('end', () => {
+        res.end();  // Ensure the response is closed when download finishes
     });
 });
+
+server.get('/latest-blogs',(req,res)=>{
+
+    let maxLimit = 5;
+
+    Blog.find({draft:false})
+    .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
+    .sort({ "publishedAt": -1 })
+    .select("blog_id title des banner activity tags publishedAt -_id")
+    .limit(maxLimit)
+    .then(blogs =>{
+        return res.status(200).json({blogs})
+    })
+    .catch(err =>{
+        return res.status(500).json({error:err.message})
+    })
+
+}) 
+
+server.get('/trending-blogs', (req,res) =>{
+
+    Blog.find({draft:false})
+    .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
+    .sort({ "activity.total_read": -1, "activity.total_likes":-1, "publishedAt":-1 })
+    .select("blog_id title publishedAt -_id")
+    .limit(5)
+    .then(blogs =>{
+        return res.status(200).json({blogs})
+    })
+    .catch(err=>{
+        return res.status(500).json({error:err.message})
+    })
+
+})
 
 server.post('/create-blog', verifyJWT, (req, res) => {
     const authorId = req.user;

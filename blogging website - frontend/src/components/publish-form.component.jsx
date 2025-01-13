@@ -129,7 +129,12 @@ const publishBlog = (e) => {
        <p className='text-dark-grey mb-1'>Preview</p>
 
        <div className='w-full aspect-video rounded-lg overflow-hidden bg-grey mt-4'>
-           <img  src={banner} />
+
+         {banner ? (
+                        <img src={`http://localhost:3000${banner}`} alt="Blog Banner" />             
+                        ) : (
+                          <img src={defaultBanner} alt="blog banner" />
+                        )}
        </div>
 
        <h1 className="text-4xl font-medium mt-2 leading-tight line-clamp-2">{title}</h1>

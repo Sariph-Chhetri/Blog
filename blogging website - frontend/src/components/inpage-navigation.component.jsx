@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 
+
+export let activeTabRef;
+
 const InPageNavigation = ({routes, defaultHidden = [] ,defaultActiveIndex = 0, children }) => {
 
-    let activeTabLineRef = useRef();
-    let activeTab = useRef();
+   let  activeTabLineRef = useRef();
+     activeTabRef = useRef();
 
     let [inPageNavIndex , setInPageNavIndex] = useState(defaultActiveIndex);
 
@@ -20,7 +23,7 @@ const InPageNavigation = ({routes, defaultHidden = [] ,defaultActiveIndex = 0, c
     }
 
     useEffect(()=>{
-        changePageState(activeTab.current, defaultActiveIndex)
+        changePageState(activeTabRef.current, defaultActiveIndex)
     },[])
 
   return (
@@ -32,7 +35,7 @@ const InPageNavigation = ({routes, defaultHidden = [] ,defaultActiveIndex = 0, c
         return (
 
             <button
-            ref={i == defaultActiveIndex ? activeTab : null}
+            ref={i == defaultActiveIndex ? activeTabRef : null}
              key={i} className={'p-4 px-5 capitalize ' + ( inPageNavIndex == i ? "text-black" : "text-dark-grey " + ( defaultHidden.includes(route) ? "md:hidden" : "" ))}
             onClick={(e) =>{changePageState(e.target,i)}}
             >

@@ -38,6 +38,7 @@ const App = () => {
             <Route path="/blog/:blog_id" element={<BlogPage />} />
             </Route>
             <Route path="/editor" element={<Editor />} />
+            <Route path="/editor/:blog_id" element={<Editor />} />
         </Routes>
         </UserContext.Provider>
     )

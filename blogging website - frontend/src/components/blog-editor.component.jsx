@@ -1,5 +1,5 @@
 import React, { useContext, useEffect,useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import logo from "../imgs/logo.png";
 import AnimationWrapper from "../common/page-animation";
 import defaultBanner from "../imgs/blog banner.png";
@@ -14,6 +14,8 @@ const BlogEditor = () => {
   const {blog,blog: { title, banner, content, tags, des },setBlog,textEditor,setTextEditor,setEditorState,} = useContext(EditorContext);
 
   let { userAuth: {access_token}} = useContext(UserContext);
+  let { blog_id} = useParams();
+
 
   let navigate = useNavigate();
 
@@ -21,14 +23,17 @@ const BlogEditor = () => {
 
 
   useEffect(() => {
-    setTextEditor(
-      new EditorJS({
-        holder: "editorjs",
-        data: content,
-        placeholder: "Write Your Blog Here",
-        tools: tools,
-      })
-    );
+    if ( !textEditor.isReady){
+      setTextEditor(
+        new EditorJS({
+          holder: "editorjs",
+          data: Array.isArray(content) ? content[0] : content ,
+          placeholder: "Write Your Blog Here",
+          tools: tools,
+        })
+        );
+    }
+   
   }, []);
 
   const handleBannerUpload = async (e) => {
@@ -41,12 +46,12 @@ const BlogEditor = () => {
     setLoading(true);
    
     try {
-      const response = await axios.post("http://localhost:3000/upload-banner", formData, {
+      const response = await axios.post( import.meta.env.VITE_DOMAIN_SERVER + "/upload-banner", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       if (response.data && response.data.url) {
-        setBlog({ ...blog, banner: response.data.url }); // Set the banner URL in the state
+        setBlog({ ...blog, banner: import.meta.env.VITE_DOMAIN_SERVER + response.data.url }); // Set the banner URL in the state
         toast.success("Banner uploaded successfully!");
       }
     } catch (error) {
@@ -70,11 +75,12 @@ const BlogEditor = () => {
     input.style.height = input.scrollHeight + "px";
     setBlog({ ...blog, title: input.value });
   };
-
+ 
   const handlePublishEvent = () => {
-    // if(banner.length){
-    //     return toast.error("Upload a blog banner before publishing")
-    // }
+    
+    if(!banner.length){
+        return toast.error("Upload a blog banner before publishing")
+    }
 
     if (!title.length) {
       return toast.error("Give blog a title before publishing");
@@ -119,7 +125,7 @@ const BlogEditor = () => {
               banner,title,tags,des,content,draft:true
             }
 
-            axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/create-blog",blogObj, {
+            axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/create-blog",{...blogObj, id : blog_id}, {
               headers:{
                 'Authorization': `Bearer ${access_token}`
               }
@@ -154,7 +160,6 @@ const BlogEditor = () => {
       
         
       }
-      
 
   return (
     <>
@@ -169,7 +174,7 @@ const BlogEditor = () => {
 
         <div className="flex gap-4 ml-auto">
           <button onClick={handlePublishEvent} className="btn-dark py-2 ">
-            Publish
+           {blog_id ? "Update" : "Publish"}
           </button>
 
           <button onClick={handleSaveDraft} className="btn-light py-2 ">Save Draft</button>
@@ -185,7 +190,7 @@ const BlogEditor = () => {
               <label htmlFor="uploadBanner">
 
                 {banner ? (
-                <img src={`http://localhost:3000${banner}`} alt="Blog Banner" />             
+                <img src={banner} alt="Blog Banner" />             
                 ) : (
                   <img src={defaultBanner} alt="blog banner" />
                 )}

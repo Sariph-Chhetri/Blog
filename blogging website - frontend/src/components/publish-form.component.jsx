@@ -5,11 +5,13 @@ import { EditorContext } from '../pages/editor.pages'
 import Tag from './tags.component'
 import axios from 'axios'
 import { UserContext } from '../App'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 const PublishForm = () => {
 let characterLimit = 200;
 let tagLimit = 10;
+let {blog_id} = useParams();
+
  let {blog:{banner,title,tags,des,content}, blog ,setEditorState , setBlog } = useContext(EditorContext)
 
  let {userAuth:{access_token}} = useContext(UserContext)
@@ -57,9 +59,11 @@ const handleKeyDown = (e)=>{
 }
 
 const publishBlog = (e) => {
-  // Validate if content is empty or improperly structured
-  console.log('Content being sent:', content);
-  
+   
+  if(!banner.length){
+    return toast.error("Upload a blog banner before publishing")
+}
+
   if (!title.length) {
       return toast.error("Write blog title before publishing");
   }
@@ -85,7 +89,7 @@ const publishBlog = (e) => {
       draft: false
   };
 
-  axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/create-blog", blogObj, {
+  axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/create-blog", {...blogObj, id:blog_id}, {
       headers: {
           'Authorization': `Bearer ${access_token}`
       }
@@ -131,7 +135,7 @@ const publishBlog = (e) => {
        <div className='w-full aspect-video rounded-lg overflow-hidden bg-grey mt-4'>
 
          {banner ? (
-                        <img src={`http://localhost:3000${banner}`} alt="Blog Banner" />             
+                        <img src={banner} alt="Blog Banner" />             
                         ) : (
                           <img src={defaultBanner} alt="blog banner" />
                         )}
@@ -165,7 +169,7 @@ const publishBlog = (e) => {
 
        <p className='mt-1 text-dark-grey text-sm text-right'>{characterLimit - des.length } characters left</p>
 
-       <p className='text-dark-grey mb-2 mt-9'>Topics - ( Helps is searching and ranking your blog post)</p>
+       <p className='text-dark-grey mb-2 mt-9'>Topics - ( Helps in searching and ranking your blog post)</p>
 
        <div className='relative input-box pl-2 py-2 pb-4'>
         <input type='text' placeholder='Topic' className='sticky input-box bg-white top-0 left-0 pl-4 mb-3 focus:bg-white ' 
@@ -184,7 +188,7 @@ const publishBlog = (e) => {
          <button className='btn-dark px-8'
          onClick={publishBlog}
          >
-          Publish
+         {blog_id ? "Update" : "Publish"}
          </button>
 
         </div>

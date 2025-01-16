@@ -14,6 +14,7 @@ import multer from "multer";
 //schemas
 import Blog from "./Schema/Blog.js"
 import User from './Schema/User.js'
+import Notification from './Schema/Notification.js'
 
 configDotenv();
 const server = express();
@@ -286,19 +287,19 @@ server.get('/trending-blogs', (req,res) =>{
 })
 
 server.post('/search-blogs',(req,res) =>{
-    let { tag, author, query ,page }  = req.body;
+    let { tag, author, query ,page, limit, eliminate_blog }  = req.body;
 
     let findQuery ;
 
     if(tag){
-        findQuery = { tags: tag, draft:false };
+        findQuery = { tags: tag, draft:false, blog_id: { $ne : eliminate_blog } };
     }else if(query){
         findQuery = {draft:false, title: new RegExp(query, 'i') }
     }else if(author){
          findQuery = {author, draft:false}
     }
 
-    let maxLimit = 5;
+    let maxLimit = limit ? limit : 2;
 
     Blog.find(findQuery)
     .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
@@ -374,7 +375,7 @@ server.post ( '/get-profile' , (req,res) =>{
 
 server.post('/create-blog', verifyJWT, (req, res) => {
     const authorId = req.user;
-    let { title, des, banner, tags, content, draft } = req.body;;
+    let { title, des, banner, tags, content, draft, id } = req.body;;
 
     if (!title || !title.length) {
         console.error("Error: Missing title");
@@ -404,9 +405,23 @@ server.post('/create-blog', verifyJWT, (req, res) => {
     // Ensure tags are in lowercase
     tags = tags.map(tag => tag.toLowerCase());
 
-    const blog_id = title.replace(/[^a-zA-Z0-9]/g, ' ').replace(/\s+/g, "-").trim() + nanoid();
+   let blog_id = id || title.replace(/[^a-zA-Z0-9]/g, ' ').replace(/\s+/g, "-").trim() + nanoid();
 
-    const blog = new Blog({
+   if(id) {
+
+    Blog.findOneAndUpdate({ blog_id }, {title, des, banner, content, tags, draft: draft ? draft : false})
+    .then( () =>{
+        return res.status(200).json({ id: blog_id})
+    })
+    .catch( err =>{
+        return res.status(500).json({ error: err.message})
+    })
+
+   }
+   else
+   {
+
+    let blog = new Blog({
         title,
         des,
         banner,
@@ -435,13 +450,15 @@ server.post('/create-blog', verifyJWT, (req, res) => {
             console.error('Error saving blog:', err); // Log the exact error message here
             return res.status(500).json({ error: err.message });
         });
+   }
+   
 });
 
 server.post('/get-blog', (req,res)=>{
 
-    let { blog_id } = req.body;
+    let { blog_id, draft, mode } = req.body;
 
-    let incrementVal = 1;
+    let incrementVal = mode != "edit" ? 1 : 0;
 
     Blog.findOneAndUpdate ( { blog_id }, { $inc :{"activity.total_reads": incrementVal } })
     .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname ")
@@ -454,10 +471,74 @@ server.post('/get-blog', (req,res)=>{
             return res.status(500).json({ error : err.message })
         })
 
+        if(blog.draft && !draft){
+            return res.status(500).json( { error : `You can't access draft blogs`})
+
+        }
+
         return res.status(200).json( { blog })
     })
     .catch( err =>{
         return res.status(500).json({ error : err.message })
+    })
+
+})
+
+server.post( '/like-blog' , verifyJWT , (req,res)=>{
+
+    let user_id = req.user;
+
+    let { _id, isLikedByUser } = req.body;
+
+    let incrementVal = !isLikedByUser ? 1 : -1;
+
+    Blog.findOneAndUpdate( { _id }, { $inc : { "activity.total_likes": incrementVal } })
+    .then( blog =>{
+       
+
+        if(!isLikedByUser){
+            let like = new Notification({
+                type : "like",
+                blog : _id,
+                notification_for : blog.author,
+                user : user_id
+            })
+
+            like.save()
+            .then( notification => {
+                return res.status(200).json( { liked_by_user : true})
+            })
+            .catch(err=>{
+                return res.status(500).json({error : err.message })
+            })
+        }
+        else{
+
+            Notification.findOneAndDelete ({ user: user_id, blog:_id, type: 'like' })
+            .then( data =>{
+                return res.status(200).json({ liked_by_user:false})
+            })
+            .catch(err=>{
+                return res.status(500).json({error : err.message })
+            })
+
+        }
+
+    })
+
+})
+
+server.post( '/isliked-by-user', verifyJWT , (req,res) =>{
+
+    let user_id = req.user;
+    let { _id } = req.body;
+
+    Notification.exists( { user : user_id , type: 'like', blog: _id})
+    .then( result =>{
+        return res.status(200).json({ result })
+    })
+    .catch( err=>{
+        return res.status(500).json({ error:err.message})
     })
 
 })

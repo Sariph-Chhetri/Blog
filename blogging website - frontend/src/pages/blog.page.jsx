@@ -7,6 +7,8 @@ import { getDay } from "../common/date";
 import BlogInteraction from "../components/blog-interaction.component";
 import BlogPostCard from "../components/blog-post.component";
 import BlogContent from "../components/blog-content.component";
+import CommentsContainer from "../components/comments.component";
+import { fetchComments } from "../components/comments.component";
 
 export const blogStructure = {
   title: "",
@@ -26,6 +28,8 @@ const BlogPage = () => {
   const [similarBlog, setSimilarBlog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [ isLikedByUser, setIsLikedByUser]  = useState(false);
+  const [ commentsWrapper, setCommentsWrapper] = useState(true);
+  const [totalParentCommentsLoaded, setTotalParentCommentsLoaded] = useState(0);
 
   let {
     title,
@@ -41,7 +45,9 @@ const BlogPage = () => {
   const fetchBlog = () => {
     axios
       .post(import.meta.env.VITE_DOMAIN_SERVER + "/get-blog", { blog_id })
-      .then(({data:{blog}, data: { blog : { tags}} }) => {
+      .then(async ({data:{blog}, data: { blog : { tags}} }) => {
+
+        blog.commments = await fetchComments({ blog_id : blog._id, setParentCommentCountFunc : setTotalParentCommentsLoaded})
 
         setBlog(blog);
 
@@ -60,14 +66,19 @@ const BlogPage = () => {
   };
 
   useEffect(() => {
+
     resetState();
     fetchBlog();
+
   }, [blog_id]);
 
   const resetState = () =>{
-    setBlog(blogStructure)
-    setSimilarBlog(null)
-    setLoading(true)
+    setBlog(blogStructure);
+    setSimilarBlog(null);
+    setLoading(true);
+    setIsLikedByUser(false);
+    setCommentsWrapper(true);
+    setTotalParentCommentsLoaded(0);
   }
 
   return (
@@ -75,7 +86,10 @@ const BlogPage = () => {
       {loading ? (
         <Loader />
       ) : (
-        <blogContext.Provider value={{ blog, setBlog, isLikedByUser, setIsLikedByUser }}>
+        <blogContext.Provider value={{ blog, setBlog, isLikedByUser, setIsLikedByUser, commentsWrapper, setCommentsWrapper, totalParentCommentsLoaded, setTotalParentCommentsLoaded }}>
+
+         <CommentsContainer />
+
         <div className="max-w-[900px] center py-10 max-lg:px-[5vw] ">
           <img
             src={banner}

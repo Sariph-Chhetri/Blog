@@ -28,7 +28,7 @@ const BlogPage = () => {
   const [similarBlog, setSimilarBlog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [ isLikedByUser, setIsLikedByUser]  = useState(false);
-  const [ commentsWrapper, setCommentsWrapper] = useState(true);
+  const [ commentsWrapper, setCommentsWrapper] = useState(false);
   const [totalParentCommentsLoaded, setTotalParentCommentsLoaded] = useState(0);
 
   let {
@@ -45,13 +45,15 @@ const BlogPage = () => {
   const fetchBlog = () => {
     axios
       .post(import.meta.env.VITE_DOMAIN_SERVER + "/get-blog", { blog_id })
-      .then(async ({data:{blog}, data: { blog : { tags}} }) => {
+      .then(async ({data : { blog } }) => {
 
-        blog.commments = await fetchComments({ blog_id : blog._id, setParentCommentCountFunc : setTotalParentCommentsLoaded})
+        blog.comments = await fetchComments({ blog_id : blog._id, setParentCommentCountFunc : setTotalParentCommentsLoaded})
 
+       
         setBlog(blog);
+        
 
-        axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/search-blogs",{ tag: tags[0], limit:6, eliminate_blog:blog_id })
+        axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/search-blogs",{ tag: blog.tags[0], limit:6, eliminate_blog : blog_id })
         .then( ( { data}) =>{
           
                setSimilarBlog(data.blogs)
@@ -77,7 +79,7 @@ const BlogPage = () => {
     setSimilarBlog(null);
     setLoading(true);
     setIsLikedByUser(false);
-    setCommentsWrapper(true);
+    setCommentsWrapper(false);
     setTotalParentCommentsLoaded(0);
   }
 

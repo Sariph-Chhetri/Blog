@@ -548,22 +548,28 @@ server.post( '/add-comment',verifyJWT ,(req,res)=>{
 
     let user_id = req.user;
 
-    let { _id, comment, blog_author } = req.body;
+    let { _id, comment, blog_author, replying_to } = req.body;
+    console.log(replying_to)
 
     if(!comment.length){
         return res.status(403).json({error :"Write something to leave a comment"});
     }
 
     // Creating a comment doc
-    let commentObj = new Comment ( {
+    let commentObj = {
         blog_id : _id, blog_author, comment, commented_by : user_id, 
-    })
+    }
 
-    commentObj.save().then( commentFile =>{
+    if(replying_to){
+        commentObj.parent = replying_to;
+        commentObj.isReply = true;
+    }
+
+    new Comment(commentObj).save().then(async commentFile =>{
         
          let {comment, commentedAt, children } = commentFile;
 
-         Blog.findOneAndUpdate( { _id },{ $push : { "comments": commentFile._id }, $inc : {"activity.total_comments": 1}, "activity.total_parent_comments":1 })
+         Blog.findOneAndUpdate( { _id },{ $push : { "comments": commentFile._id }, $inc : {"activity.total_comments": 1, "activity.total_parent_comments": replying_to ? 0 : 1 } })
          .then( blog =>{
             console.log('New comment created in DB')
          })
@@ -572,11 +578,22 @@ server.post( '/add-comment',verifyJWT ,(req,res)=>{
         })
 
         let notificationObj = {
-            type : "comment",
+            type : replying_to ? "reply" : "comment",
             blog :_id,
             notification_for: blog_author,
             user : user_id,
             comment : commentFile._id
+        }
+
+        if(replying_to){
+
+            notificationObj.replied_on_comment = replying_to;
+
+            await Comment.findOneAndUpdate ( {_id: replying_to }, {$push: { children : commentFile._id } })
+            .then( replyingToCommentDoc =>{
+                notificationObj.notification_for = replyingToCommentDoc.commented_by
+            })
+
         }
 
         new Notification(notificationObj).save().then(notification =>{
@@ -596,7 +613,6 @@ server.post( '/add-comment',verifyJWT ,(req,res)=>{
 server.post("/get-blog-comments", (req, res) =>{
 
     let {blog_id, skip} = req.body;
-    console.log('blog id:', blog_id)
 
     let maxLimit = 5;
 
@@ -608,11 +624,105 @@ server.post("/get-blog-comments", (req, res) =>{
         'commentedAt': -1
     })
     .then( comment =>{
+      
         return res.status(200).json(comment)
     })
     .catch( err=>{
         console.log(err)
         return res.status(500).json({error:"error in get-blog-comments route"})
+    })
+
+})
+
+server.post('/get-replies', (req,res) =>{
+
+    let { _id, skip } = req.body;
+
+    let maxLimit=5;
+
+    Comment.findOne( { _id })
+    .populate({
+        path : "children",
+        option :{
+            limit:maxLimit,
+            skip:skip,
+            sort : {'commentedAt': -1}
+        },
+        populate: {
+            path:"commented_by",
+            select: "personal_info.profile_img personal_info.fullname personal_info.username "
+        },
+        select : "-blog_id -updatedAt"
+    })
+    .select("children")
+    .then( doc =>{
+        return res.status(200).json({ replies : doc.children })
+    })
+    .catch( err=>{
+        return res.status(500).json({error:err.message})
+    })
+
+})
+
+const deleteComments = ( _id) =>{
+
+    Comment.findOneAndDelete ( { _id})
+    .then( comment =>{
+        if(comment.parent){
+            Comment.findOneAndUpdate ( {_id : comment.parent },{ $pull :{ children:_id} } )
+            .then( data =>{
+                console.log('comment deleted from parent')
+            })
+            .catch( err=>{
+                return res.status(500).json({error:err.message})
+            })       
+        }
+
+        Notification.findOneAndDelete ( { comment: _id })
+        .then( notification => console.log('comment notification deleted') )
+
+        Notification.findOneAndDelete ( { reply : _id})
+        .then( notification => console.log('reply notification deleted') )
+
+        Blog.findOneAndUpdate ( { _id : comment.blog_id}, { $pull : {comments : _id}, $inc : { "activity.total_comments": -1 }, "activity.total_parent_comments": comment.parent ? 0 : -1 })
+        .then( blog =>{
+
+            if(comment.children.length){
+                comment.children.map( replies =>{
+                    deleteComments(replies);
+                })
+            }
+             
+        })
+
+    })
+    .catch( err=>{
+        return res.status(500).json({error:err.message})
+    })
+
+}
+
+server.post('/delete-comment', verifyJWT, (req,res) =>{
+
+    let user_id = req.user;
+
+    let { _id} = req.body;
+
+    Comment.findOne ( { _id})
+    .then( comment =>{
+
+        if ( user_id == comment.commented_by || user_id == comment.blog_author){
+
+            deleteComments(_id)
+
+            return res.status(200).json({status : "done"})
+
+        }
+        else
+        {
+            return res.status(403).json( { error : "You can't delete this comment."})
+        }
+
     })
 
 })

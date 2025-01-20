@@ -610,46 +610,92 @@ server.post( '/add-comment',verifyJWT ,(req,res)=>{
 
 })
 
-server.post("/get-blog-comments", (req, res) =>{
+// server.post("/get-blog-comments", (req, res) =>{
 
-    let {blog_id, skip} = req.body;
+//     let {blog_id, skip} = req.body;
 
+//     let maxLimit = 5;
+
+//     Comment.find( { blog_id, isReply: false})
+//     .populate('commented_by', 'personal_info.username personal_info.fullname personal_info.profile_img')
+//     .skip(skip)
+//     .limit(maxLimit)
+//     .sort({
+//         'commentedAt': -1
+//     })
+//     .then( comment =>{
+      
+//         return res.status(200).json(comment)
+//     })
+//     .catch( err=>{
+//         console.log(err)
+//         return res.status(500).json({error:"error in get-blog-comments route"})
+//     })
+
+// })
+
+server.post("/get-blog-comments", (req, res) => {
+    let { blog_id, skip } = req.body;
     let maxLimit = 5;
 
-    Comment.find( { blog_id, isReply: false})
-    .populate('commented_by', 'personal_info.username personal_info.fullname personal_info.profile_img')
-    .skip(skip)
-    .limit(maxLimit)
-    .sort({
-        'commentedAt': -1
-    })
-    .then( comment =>{
-      
-        return res.status(200).json(comment)
-    })
-    .catch( err=>{
-        console.log(err)
-        return res.status(500).json({error:"error in get-blog-comments route"})
-    })
+    Comment.find({ blog_id, isReply: false })
+        .populate('commented_by', 'personal_info.username personal_info.fullname personal_info.profile_img')
+        .then(comments => {
+            // Step 1: Add reply count to each comment based on the length of the 'children' array
+            comments.forEach(comment => {
+                comment.replyCount = comment.children ? comment.children.length : 0;
+            });
 
-})
+            // Step 2: Sort comments by reply count (desc) and then by commentedAt (desc)
+            comments.sort((a, b) => {
+                // First sort by reply count in descending order
+                if (b.replyCount !== a.replyCount) {
+                    return b.replyCount - a.replyCount;
+                }
+
+                // If reply count is the same, sort by commentedAt in descending order
+                return new Date(b.commentedAt) - new Date(a.commentedAt);
+            });
+
+            // Step 3: Apply pagination (skip and limit)
+            const paginatedComments = comments.slice(skip, skip + maxLimit);
+
+            // Step 4: Return the sorted and paginated comments, including the 'comment' field
+            const response = paginatedComments.map(comment => ({
+                _id: comment._id,
+                comment: comment.comment, // Include the comment text
+                blog_id: comment.blog_id,
+                commented_by: comment.commented_by,
+                commentedAt: comment.commentedAt,
+                replyCount: comment.replyCount,
+                children: comment.children, // Include children (replies) if you want to send them as well
+                isReply: comment.isReply
+            }));
+
+            return res.status(200).json(response);
+        })
+        .catch(err => {
+            console.log(err);
+            return res.status(500).json({ error: "Error in get-blog-comments route" });
+        });
+});
 
 server.post('/get-replies', (req,res) =>{
 
     let { _id, skip } = req.body;
 
-    let maxLimit=5;
+
 
     Comment.findOne( { _id })
     .populate({
         path : "children",
-        option :{
-            limit:maxLimit,
-            skip:skip,
-            sort : {'commentedAt': -1}
+        options: {
+           
+            skip: skip,
+            sort: {'commentedAt': -1}
         },
         populate: {
-            path:"commented_by",
+            path: "commented_by",
             select: "personal_info.profile_img personal_info.fullname personal_info.username "
         },
         select : "-blog_id -updatedAt"

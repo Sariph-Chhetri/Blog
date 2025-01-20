@@ -6,11 +6,10 @@ import NoDataMessage from './nodata.component';
 import AnimationWrapper from '../common/page-animation';
 import CommentCard from './comment-card.component';
 
-export const fetchComments = async ( { skip = 0, blog_id, setParentCommentCountFunc, comment_array = null })=>{
-
+export const fetchComments = async ( { skip = 0, blog_id, setParentCommentCountFunc, comment_array = null})=>{
     let res;
 
-   await axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/get-blog-comments", { blog_id, skip})
+   await axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/get-blog-comments", { blog_id, skip, })
    .then( ({ data}) =>{
 
     data.map( comment =>{
@@ -22,7 +21,7 @@ export const fetchComments = async ( { skip = 0, blog_id, setParentCommentCountF
     if(comment_array == null){
         res = { results: data}
     }
-    else{
+    else{ 
         res = {results: [...comment_array, ...data]}
     }
 
@@ -32,15 +31,18 @@ export const fetchComments = async ( { skip = 0, blog_id, setParentCommentCountF
         res = { error: "Can't fetch comments" };
 })
     return res;
+   
 }
+
 
 const CommentsContainer = () => {
 
-    let {blog, blog:{_id, title, comments : {results : commentsArr}, activity:{ total_parent_comments }},commentsWrapper, setCommentsWrapper,totalParentCommentsLoaded, setTotalParentCommentsLoaded, setBlog} = useContext(blogContext)
+    let {blog, blog: { _id, title, comments : {results : commentsArr}, activity:{ total_parent_comments }},commentsWrapper, setCommentsWrapper,totalParentCommentsLoaded, setTotalParentCommentsLoaded, setBlog} = useContext(blogContext)
+
 
     const loadMoreComments = async () =>{
 
-        let newCommentsArr = await fetchComments( { skip : totalParentCommentsLoaded, blog_id: _id, setParentCommentCountFunc: setTotalParentCommentsLoaded, comment_array: commentsArr})
+        let newCommentsArr = await fetchComments( { skip : totalParentCommentsLoaded, blog_id: _id, setParentCommentCountFunc: setTotalParentCommentsLoaded, comment_array: commentsArr })
 
         setBlog({...blog, comments: newCommentsArr })
     }

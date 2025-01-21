@@ -1,7 +1,7 @@
 import { configDotenv } from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
-import bcrypt from 'bcrypt'
+import bcrypt, { hash } from 'bcrypt'
 import { nanoid } from "nanoid";
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
@@ -237,6 +237,49 @@ server.get('/uploads/:id', (req, res) => {
         res.end();  // Ensure the response is closed when download finishes
     });
 });
+
+server.post('/change-password', verifyJWT,(req,res)=>{
+
+    let { currentPassword, newPassword} = req.body;
+
+    let passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,20}$/;
+
+
+    if(!passwordRegex.test(currentPassword) || !passwordRegex.test(newPassword)){
+        return res.status(403).json({error:'Password must be 6 to 20 characters long with 1 uppercase,1 lowercase and 1 integer'})
+    }
+
+    User.findOne( { _id: req.user})
+    .then( user =>{
+
+        bcrypt.compare(currentPassword, user.personal_info.password, (err, result)=>{
+            if(err){
+                return res.status(500).json({ error:'some error occured while changing password!'})
+            }
+            if(!result){
+                return res.status(403).json( {error:"Incorrect current password" })
+            }
+
+            bcrypt.hash(newPassword, 10, (err, hashed_password)=>{
+
+                User.findOneAndUpdate({_id:req.user},{'personal_info.password': hashed_password})
+                .then( (u)=>{
+                    return res.status(200).json( {status :"Password Changed" })
+                })
+                .catch( err =>{
+                    return res.status(500).json( {error: err.message })
+                })
+
+            })
+
+        })
+
+    })
+    .catch( err =>{
+        return res.status(500).json( {error: err.message })
+    })
+
+})
 
 server.post('/latest-blogs',(req,res)=>{
 

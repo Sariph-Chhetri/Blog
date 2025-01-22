@@ -42,6 +42,7 @@ mongoose.connect(process.env.DB_LOCATION , {
 // MongoDB connection for GridFS setup
 const db = mongoose.connection;
 const bucket = new GridFSBucket(db, { bucketName: 'banners' }); // 'banners' is the name of the GridFS bucket
+const profileImageBucket = new GridFSBucket(db, { bucketName: 'profile_images' });
 
 
 // File upload setup using Multer
@@ -237,6 +238,32 @@ server.get('/uploads/:id', (req, res) => {
         res.end();  // Ensure the response is closed when download finishes
     });
 });
+
+server.post('/upload-profile-image', upload.single('profile_images'), (req, res) => {
+    if (!req.file) {
+      return res.status(400).send('No file uploaded');
+    }
+  
+    // Use the profileImageBucket for uploading profile image
+    const writestream = profileImageBucket.openUploadStream(req.file.originalname, {
+      content_type: req.file.mimetype,
+    });
+  
+    writestream.write(req.file.buffer);
+    writestream.end();
+  
+    writestream.on('close', (file) => {
+      // File uploaded successfully
+      const imageUrl = `${req.protocol}://${req.get('host')}/file/${file._id}`;
+      res.json({ imageUrl }); // Return the image URL
+    });
+  
+    writestream.on('error', (err) => {
+      console.error('Error uploading file:', err);
+      res.status(500).json({ error: 'Error uploading profile image' });
+    });
+  });
+  
 
 server.post('/change-password', verifyJWT,(req,res)=>{
 

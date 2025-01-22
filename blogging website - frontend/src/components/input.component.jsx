@@ -11,6 +11,7 @@ const InputBox = (props) => {
      defaultValue={props.value}
      id={props.id}
      className='input-box'
+     disabled = {props.disable}
       />
       <i className={`fi ${props.icon} input-icon`} />
 

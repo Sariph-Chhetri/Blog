@@ -6,14 +6,16 @@ import AnimationWrapper from '../common/page-animation';
 import Loader from '../components/loader.component';
 import toast, { Toaster } from 'react-hot-toast';
 import InputBox from '../components/input.component';
+import { storeInSession } from '../common/session';
 
 const EditProfile = () => {
 
   let bioLimit = 150;
 
   let profileImgEle = useRef();
+  let editProfileForm = useRef();
 
-  let {userAuth, userAuth :{access_token}}=useContext(UserContext);
+  let {userAuth, userAuth :{access_token}, setUserAuth}=useContext(UserContext);
   const [profile,  setProfile ]=useState(profileDataStructure);
   const [loading, setLoading] = useState(true);
   const [ charactersLeft, setCharactersLeft ] = useState(bioLimit);
@@ -52,42 +54,172 @@ const EditProfile = () => {
       let loadingToast = toast.loading('Uploading....');
       e.target.setAttribute('disabled', true);
   
-      // Create FormData to send image as multipart form-data
       const formData = new FormData();
       formData.append('profile_images', updatedProfileImg);
   
-      // Send the image to the server (using the new route for profile image)
       axios.post(import.meta.env.VITE_DOMAIN_SERVER + '/upload-profile-image', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       })
       .then((response) => {
-        toast.success('Profile image uploaded successfully');
-        // Set the profile image URL received in the response
-        const imageUrl = response.data.imageUrl;
+        
+        const imageUrl = response.data.url; // Now the URL is returned in the format `/get-profile/:id`
         console.log(imageUrl)
         profileImgEle.current.src = imageUrl; // Update profile image preview
         setProfile(prevProfile => ({ ...prevProfile, profile_img: imageUrl })); // Update state
+
+        if(imageUrl){
+
+          axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/update-profile-img", { url:imageUrl },{
+            headers:{
+              'Authorization': `Bearer ${access_token}`
+            }
+          })
+          .then( ( { data})=>{
+            let newUserAuth = {...userAuth, profile_img:data.profile_img}
+
+            storeInSession("user", JSON.stringify(newUserAuth));
+            setUserAuth(newUserAuth);
+
+            setUpdatedProfileImage(null);
+            e.target.removeAttribute('disabled');
+            toast.dismiss(loadingToast);
+            toast.success('Profile image uploaded successfully');
+          })
+          .catch( ( { response})=>{
+            toast.dismiss(loadingToast);
+            e.target.removeAttribute('disabled'); 
+            toast.error(response.data.error);
+          })
+        }
+
       })
       .catch((err) => {
         toast.error('Profile image upload failed');
         console.error(err);
       })
-      .finally(() => {
-        e.target.removeAttribute('disabled');
-        toast.dismiss(loadingToast);
-      });
+      
     }
   };
+
+  // const handleSubmit = (e)=>{
+  //   e.preventDefault();
+
+  //   let form = new FormData(editProfileForm.current);
+  //   let formData = {};
+
+  //   for( let [key, value] of form.entries()){
+  //     formData[key] = value;
+  //   }
+
+  //   let { username, bio, youtube, facebook, twitter, github, instagram, website}= formData;
+
+  //   if(username.length < 3){
+  //     return toast.error("Username must be at least 3 characters long")
+  //   }
+
+  //   if(bio.length > bioLimit){
+  //     return toast.error( `Bio should not be more than ${bioLimit} `)
+  //   }
+
+  //   let loadingToast = toast.loading("Updating.......")
+  //   e.target.setAttribute("disabled", true)
+
+  //   axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/update-profile",{username,bio,
+  //     social_links : { youtube, facebook, twitter, github, instagram, website }
+  //   },
+  //   {
+  //     headers:{
+  //       'Authorization' : `Bearer ${access_token}`
+  //     }
+  //   })
+  //   .then( ( {data})=>{
+
+  //     if(userAuth.username != data.username){
+
+  //       let newUserAuth = {...userAuth, username:data.username};
+
+  //       storeInSession("user", JSON.stringify(newUserAuth));
+  //       setUserAuth(newUserAuth);
+
+  //     }
+  //     toast.dismiss(loadingToast);
+  //     e.target.removeAttribute("disabled");
+  //     toast.success("Profile Updated")
+
+  //   })
+  //   .catch(({ response}) =>{
+    
+  //   toast.dismiss(loadingToast);
+  //   e.target.removeAttribute("disabled");
+  //   toast.error(response.data.error)
+
+  //   })
+
+  // }
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
   
+    let form = new FormData(editProfileForm.current);
+    let formData = {};
+    
   
+    for (let [key, value] of form.entries()) {
+      formData[key] = value;
+    }
+    console.log(formData)
+    let { username, bio, youtube, facebook, twitter, github, instagram, website } = formData;
+  
+    if (username.length < 3) {
+      return toast.error("Username must be at least 3 characters long");
+    }
+  
+    if (bio.length > bioLimit) {
+      return toast.error(`Bio should not be more than ${bioLimit} characters`);
+    }
+  
+    let loadingToast = toast.loading("Updating.......")
+    e.target.setAttribute("disabled", true)
+  
+    axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/update-profile", {
+      username, bio,
+      social_links: { youtube, facebook, twitter, github, instagram, website }
+    },
+      {
+        headers: {
+          'Authorization': `Bearer ${access_token}`
+        }
+      })
+      .then(({ data }) => {
+  
+        if (userAuth.username !== data.username) {
+          let newUserAuth = { ...userAuth, username: data.username };
+  
+          storeInSession("user", JSON.stringify(newUserAuth));
+          setUserAuth(newUserAuth);
+        }
+        toast.dismiss(loadingToast);
+        e.target.removeAttribute("disabled");
+        toast.success("Profile Updated");
+  
+      })
+      .catch((error) => {
+        toast.dismiss(loadingToast);
+        e.target.removeAttribute("disabled");
+        const errorMessage = error?.response?.data?.error || 'An error occurred';
+        toast.error(errorMessage);
+        console.error(error);
+      });
+  }
+    
 
   return (
     <AnimationWrapper>
       {
         loading ? <Loader />  :
-        <form >
+        <form ref={editProfileForm}  >
           <Toaster />
 
           <h1 className='max-md:hidden'>
@@ -119,7 +251,7 @@ const EditProfile = () => {
                 </div>
               </div>
 
-              <InputBox name="username" type="text" value={profile_username} placeholder="Username" disable={true} icon="fi-rr-at" />
+              <InputBox name="username" type="text" value={profile_username} placeholder="Username" icon="fi-rr-at" />
               <p className='text-dark-grey -mt-3'>Username is used to search user and will be visible to all users</p>
 
               <textarea name="bio" placeholder='Bio' maxLength={bioLimit} defaultValue={bio} className='h-64 input-box lg:h-40 resize-none leading-7 mt-5 pl-5' onChange={handleCharacterChange} ></textarea>
@@ -139,7 +271,7 @@ const EditProfile = () => {
                 }
 
               </div>
-              <button type='submit' className='btn-dark w-auto px-10'> Update </button>
+              <button type='submit' className='btn-dark w-auto px-10' onClick={handleSubmit} > Update </button>
 
             </div>
 

@@ -16,6 +16,8 @@ import Blog from "./Schema/Blog.js"
 import User from './Schema/User.js'
 import Notification from './Schema/Notification.js'
 import Comment from './Schema/Comment.js'
+import Notifications from "../blogging website - frontend/src/pages/notifications.page.jsx";
+import { removeFromSession } from "../blogging website - frontend/src/common/session.jsx";
 
 configDotenv();
 const server = express();
@@ -239,32 +241,72 @@ server.get('/uploads/:id', (req, res) => {
     });
 });
 
-server.post('/upload-profile-image', upload.single('profile_images'), (req, res) => {
-    if (!req.file) {
-      return res.status(400).send('No file uploaded');
+// Endpoint to upload profile image to MongoDB using GridFS
+server.post("/upload-profile-image", upload.single('profile_images'), (req, res) => {
+    const file = req.file;
+    
+    if (!file) {
+      console.log('No file uploaded');
+      return res.status(400).json({ error: "No file uploaded" });
     }
-  
-    // Use the profileImageBucket for uploading profile image
-    const writestream = profileImageBucket.openUploadStream(req.file.originalname, {
-      content_type: req.file.mimetype,
-    });
-  
-    writestream.write(req.file.buffer);
-    writestream.end();
-  
-    writestream.on('close', (file) => {
-      // File uploaded successfully
-      const imageUrl = `${req.protocol}://${req.get('host')}/file/${file._id}`;
-      res.json({ imageUrl }); // Return the image URL
-    });
-  
-    writestream.on('error', (err) => {
-      console.error('Error uploading file:', err);
-      res.status(500).json({ error: 'Error uploading profile image' });
-    });
-  });
-  
+    
+    // Proceed with GridFS upload
+    const uploadStream = profileImageBucket.openUploadStream(file.originalname);
+    uploadStream.end(file.buffer);
 
+    uploadStream.on('finish', () => {
+        // Return the image URL for profile image
+        const imageUrl = `${process.env.SERVER}/get-profile/${uploadStream.id}`;  // Path to the profile image using 'get-profile'
+        res.status(200).json({ success: true, url: imageUrl });  // Send the URL back to the frontend
+    });
+  
+    uploadStream.on('error', (err) => {
+        console.error('Error uploading file:', err);
+        res.status(500).json({ error: "Error uploading profile image" });
+    });
+});
+
+  // Retrieving profile image from GridFS
+server.get('/get-profile/:id', (req, res) => {
+    const fileId = new mongoose.Types.ObjectId(req.params.id);
+
+    // Open download stream from the bucket (before checking files)
+    const downloadStream = profileImageBucket.openDownloadStream(fileId);
+
+    // Handle any errors in case the file does not exist
+    downloadStream.on('error', (err) => {
+        console.error('Error while downloading file:', err);  // Detailed error logging
+        return res.status(404).json({ error: 'File not found' });  // Return file not found if error
+    });
+
+    // Set the appropriate content type for the file
+    downloadStream.on('file', (file) => {
+        res.set('Content-Type', file.contentType);  // Ensure the correct content type is sent
+    });
+
+    // Pipe the download stream to the response
+    downloadStream.pipe(res);
+
+    // The 'end' event should be handled by the pipe, but just in case, you can handle it
+    downloadStream.on('end', () => {
+        res.end();  // Ensure the response is closed when download finishes
+    });
+});
+
+server.post('/update-profile-img', verifyJWT , (req, res)=>{
+
+    let { url} = req.body;
+
+    User.findOneAndUpdate( { _id: req.user}, { "personal_info.profile_img":url })
+    .then( ()=>{
+        return res.status(200).json( {profile_img: url})
+    })
+    .catch( err =>{
+        return res.status(500).json( {error: err.message })
+    })
+
+})
+  
 server.post('/change-password', verifyJWT,(req,res)=>{
 
     let { currentPassword, newPassword} = req.body;
@@ -370,7 +412,7 @@ server.post('/search-blogs',(req,res) =>{
          findQuery = {author, draft:false}
     }
 
-    let maxLimit = limit ? limit : 2;
+    let maxLimit = limit ? limit : 5;
 
     Blog.find(findQuery)
     .populate("author", "personal_info.profile_img personal_info.username personal_info.fullname -_id")
@@ -440,6 +482,60 @@ server.post ( '/get-profile' , (req,res) =>{
     .catch( err =>{
       console.log(err)
       return res.status(500).json({error:err.message})
+    })
+
+})
+
+server.post('/update-profile', verifyJWT , (req,res)=>{
+    let {username, bio, social_links} = req.body;
+    let bioLimit = 150;
+
+    if(username.length < 3){
+        return res.status(403).json({ error : "Username should be at least 3 characters long"})
+    }
+
+    if(bio.lenght > bioLimit){
+        return res.status(403).json({error:`Bio should not be more than ${bioLimit} `})
+      }
+     
+    let socialLinksArr = Object.keys(social_links);
+    
+    try{
+
+        for(let i=0;  i < socialLinksArr.length ; i++){
+            if(social_links[socialLinksArr[i]].length){
+               let hostname = new URL(social_links[socialLinksArr[i]]).hostname;
+               
+               if(!hostname.includes(`${socialLinksArr[i]}.com`) && socialLinksArr[i] != 'website'){
+                return res.status(403).json({ error: `${socialLinksArr[i]} link is invalid. You must enter full link`})
+               }
+
+            }
+
+        }
+
+    }
+    catch(err){
+       return res.status(500).json({ error: 'You must provide full social links with http(s) included'})
+    }
+
+    let updateObj = {
+        "personal_info.username": username,
+        "personal_info.bio": bio,
+        social_links
+    }
+
+    User.findOneAndUpdate( { _id: req.user}, updateObj, {
+        runValidators: true
+    })
+    .then( ()=>{
+        return res.status(200).json( { username})
+    })
+    .catch ( err =>{
+        if(err.code == 1100){
+            return res.status(409).json({ error : "Username already exists" })
+        }
+        return res.status(500).json({ error : err.message })
     })
 
 })
@@ -839,6 +935,88 @@ server.post('/delete-comment', verifyJWT, (req,res) =>{
             return res.status(403).json( { error : "You can't delete this comment."})
         }
 
+    })
+
+})
+
+server.get("/new-notification", verifyJWT , (req,res)=>{
+
+    let user_id = req.user;
+
+    Notification.exists( { notification_for: user_id, seen:false, user: { $ne: user_id } })
+    .then( result => {
+        if(result){
+            return res.status(200).json({ new_notification_available : true})
+        }
+        else{
+            return res.status(200).json({ new_notification_available : false})
+        }
+    })
+    .catch( err=>{
+        return res.status(500).json({error: err.message})
+    })
+
+})
+
+server.post("/notification" , verifyJWT ,(req, res) =>{
+    let user_id = req.id;
+
+    let { page, filter, deletedDocCount } = req.body;
+
+    let maxLimit = 10;
+
+    let findQuery = { notification_for: user_id, user: { $ne : user_id} }
+
+    let skipDocs = (page - 1) * maxLimit;
+
+    if(filter != 'all'){
+        findQuery.type = filter;
+    }
+
+    if(deletedDocCount){
+       skipDocs -= deletedDocCount;
+    }
+
+    Notification.find( findQuery )
+    .skip(skipDocs)
+    .limit(maxLimit)
+    .populate("blog", "title blog_id ")
+    .populate("user", "personal_info.fullname personal_info.username personal_info.profile_img")
+    .populate("comment", "comment")
+    .populate("replied_on_comment", "comment")
+    .populate("reply", "comment")
+    .sort( { createdAt: -1 })
+    .select("createdAt type seen reply ")
+    .then( notifications =>{
+
+        return res.status(200).json({ notifications})
+
+    })
+    .catch(err =>{
+        console.log(err.message)
+        return res.status(500).json ( { error: err.message})
+    })
+
+})
+
+server.post("/all-notifications-count", verifyJWT , (req,res) =>{
+
+    let user_id = req.user;
+
+    let { filter }= req.body;
+
+    let findQuery = { notification_for: user_id, user: {$ne : user_id}}
+
+    if( filter != 'all'){
+        findQuery.type = filter;
+    }
+
+    Notification.countDocuments(findQuery)
+    .then( count =>{
+        return res.status(200).json({ totalDocs : count})
+    })
+    .catch ( err=>{
+        return res.status(500).json({error: err.massage})
     })
 
 })

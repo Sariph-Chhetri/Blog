@@ -134,30 +134,47 @@ import { Link, Outlet, useNavigate } from "react-router-dom";
 import logo from "../imgs/logo.png";
 import { UserContext } from "../App";
 import UserNavigationPanel from "./user-navigation.component";
+import axios from "axios";
 
 const Navbar = () => {
   const [searchBoxVisibility, setSearchBoxVisibility] = useState(false);
   const [userNavPanel, setUserNavPanel] = useState(false);
 
-  const { userAuth, userAuth: { access_token, profile_img }} = useContext(UserContext);
+  const { userAuth, userAuth: { access_token, profile_img, new_notification_available },setUserAuth} = useContext(UserContext);
   let navigate = useNavigate();
 
   const userNavRef = useRef(null); // Ref for the user nav panel
   const profileBtnRef = useRef(null); // Ref for the profile button
 
-  // Toggle the user navigation panel visibility
+  useEffect( () =>{
+
+    if(access_token){
+      axios.get(import.meta.env.VITE_DOMAIN_SERVER + "/new-notification",{
+        headers:{
+          "Authorization": `Bearer ${access_token}`
+        }
+      })
+      .then (( { data})=>{
+          setUserAuth ( { ...userAuth, ...data})
+      }).catch(err=>{
+        console.log(err)
+      })
+    }
+
+  },[access_token])
+ 
   const handleUserNavPanel = () => {
     setUserNavPanel(prevVal => !prevVal);
   };
 
-  // Close user navigation panel if clicked outside
+  
   const handleClickOutside = (event) => {
     if (
       userNavRef.current && !userNavRef.current.contains(event.target) &&
       profileBtnRef.current && !profileBtnRef.current.contains(event.target)
     ) {
       setUserNavPanel(false);
-      console.log("Clicked outside, closing dropdown");
+     
     }
   };
 
@@ -189,7 +206,7 @@ const Navbar = () => {
       <nav className="navbar z-50">
         <Link to="/" className="flex-none w-10">
           <img src={logo} alt="logo" className="w-full" />
-        </Link>
+        </Link> 
 
         <div
           className={`absolute bg-white w-full left-0 top-full mt-0.5
@@ -230,6 +247,11 @@ const Navbar = () => {
               <Link to="/dashboard/notification">
                 <button className="w-12 h-12 rounded-full bg-grey relative hover:bg-black/10">
                   <i className="fi fi-rr-bell text-2xl block mt-1"></i>
+                 { 
+                 new_notification_available ?
+                  <span className="bg-red w-3 h-3 rounded-full absolute z-10 top-2 right-2"></span>
+                  : ""
+                   }
                 </button>
               </Link>
 

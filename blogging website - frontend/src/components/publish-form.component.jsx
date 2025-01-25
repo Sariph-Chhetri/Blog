@@ -100,7 +100,7 @@ const publishBlog = (e) => {
       toast.success("Blog Published");
 
       setTimeout(() => {
-          navigate('/');
+          navigate('/dashboard/blogs');
       }, 500);
   })
   .catch(({ response }) => {

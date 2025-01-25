@@ -1072,6 +1072,62 @@ server.post("/user-written-blogs-count", verifyJWT, (req,res)=>{
 
 })
 
+// server.post("/delete-blog", verifyJWT , (req, res) =>{
+
+//     let user_id = req.user;
+//     let { blog_id } = req.body;
+
+//     Blog.findOneAndDelete ( { blog_id })
+//     .then( blog =>{
+
+//         Notification.deleteMany( { blog: blog._id }).then( data =>{
+//             return res.status(200).json({ message: "Blog notification deleted" })
+//         })
+
+//         Comment.deleteMany( { blog_id : blog._id }).then( data =>{
+//             return res.status(200).json({ message: "Blog comments deleted" })
+//         })
+
+//         User.findOneAndUpdate ( { _id: user_id}, { $pull: { blog: blog._id }, $inc : { "account_info.total_posts": -1} }).then( data =>{
+//             return res.status(200).json({ message: "Blog deleted and user updateed" })
+//         })
+
+//         return res.status(200).json({ message: "Blog deleted" })
+//     })
+//     .catch( err =>{
+//         return res.status(500).json({ error: err.message})
+//     })
+
+// })
+
+server.post("/delete-blog", verifyJWT, (req, res) => {
+    let user_id = req.user;
+    let { blog_id } = req.body;
+
+    Blog.findOneAndDelete({ blog_id })
+        .then(blog => {
+            // Start deleting notifications, comments, and updating the user
+            return Promise.all([
+                Notification.deleteMany({ blog: blog._id }),
+                Comment.deleteMany({ blog_id: blog._id }),
+                User.findOneAndUpdate({ _id: user_id }, { $pull: { blog: blog._id }, $inc: { "account_info.total_posts": blog.draft ? 0 : -1 } })
+            ])
+                .then(() => {
+                    // Once all promises are resolved, send a single response
+                    return res.status(200).json({ message: "Blog, notifications, comments deleted, and user updated" });
+                })
+                .catch(err => {
+                    // Catch any errors from the above operations
+                    return res.status(500).json({ error: err.message });
+                });
+        })
+        .catch(err => {
+            // Catch errors related to deleting the blog itself
+            return res.status(500).json({ error: err.message });
+        });
+});
+
+
 server.listen(PORT , ()=>{
     console.log(`listening on port ${PORT}`)
 })

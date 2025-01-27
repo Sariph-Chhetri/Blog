@@ -77,18 +77,23 @@ userAuthThroughServer(serverRoute ,formData)
 
   }
   
-  const handleGoogleAuth =  (e) => {
+  // const handleGoogleAuth =  (e) => {
 
+  //   e.preventDefault();
+  
+  //   authWithGoogle().then(user =>{
+  //     console.log(user);
+  //   })
+  //   .catch(err=>{
+  //     toast.error("trouble login in through google");
+  //     return console.log(err)
+  //   })
+  
+  // }
+
+  const handleGoogleAuth = (e) =>{
     e.preventDefault();
-  
-    authWithGoogle().then(user =>{
-      console.log(user);
-    })
-    .catch(err=>{
-      toast.error("trouble login in through google");
-      return console.log(err)
-    })
-  
+    toast.error("This is not currently available !")
   }
 
   return (

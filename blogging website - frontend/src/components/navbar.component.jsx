@@ -193,6 +193,7 @@ const Navbar = () => {
     }
   };
 
+
   useEffect(() => {
     // Add event listener to detect clicks outside the profile button and dropdown
     document.addEventListener("mousedown", handleClickOutside);
@@ -280,7 +281,7 @@ const Navbar = () => {
               {/* Show the user navigation panel when userNavPanel is true */}
               {userNavPanel && (
                 <div className="absolute right-0 top-20" ref={userNavRef}>
-                  <UserNavigationPanel onLinkClick={handleLinkClick} />
+                  <UserNavigationPanel />
                 </div>
               )}
             </>

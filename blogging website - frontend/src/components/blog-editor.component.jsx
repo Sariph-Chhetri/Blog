@@ -21,7 +21,6 @@ const BlogEditor = () => {
 
   const [loading, setLoading] = useState(false);
 
-
   useEffect(() => {
     if ( !textEditor.isReady){
       setTextEditor(
@@ -164,7 +163,7 @@ const BlogEditor = () => {
   return (
     <>
       <nav className="navbar">
-        <Link to="/" className="flex-nonr w-10">
+        <Link to="/" className="flex-none w-10">
           <img src={logo} alt="logo blogeditor" />
         </Link>
 

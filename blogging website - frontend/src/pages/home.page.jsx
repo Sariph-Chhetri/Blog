@@ -167,7 +167,7 @@ const HomePage = () => {
 
             <div>
               <h1 className="font-medium text-xl mb-8">
-                Strories from all interests
+                Stories from all interests
               </h1>
 
               <div className="flex gap-3 flex-wrap">

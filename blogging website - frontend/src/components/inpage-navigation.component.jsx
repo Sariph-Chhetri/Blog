@@ -12,7 +12,7 @@ const InPageNavigation = ({
   activeTabRef = useRef();
 
   let [inPageNavIndex, setInPageNavIndex] = useState(defaultActiveIndex);
-
+  
   let [isResizeEventAdded, setIsResizeEventAdded] = useState(false);
   let [width, setWidth] = useState(window.innerWidth);
 

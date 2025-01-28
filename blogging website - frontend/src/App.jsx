@@ -14,7 +14,6 @@ import EditProfile from "./pages/edit-profile.page";
 import ChangePassword from "./pages/change-password.page";
 import Notifications from "./pages/notifications.page";
 import ManageBlogs from "./pages/manage-blogs.page";
-import Dashboard from "./pages/dashboard.page";
 
 // ScrollToTop component to reset scroll position
 const ScrollToTop = () => {

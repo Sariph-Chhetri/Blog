@@ -201,7 +201,7 @@ server.post("/upload-banner", upload.single('banner'), (req, res) => {
 
     uploadStream.on('finish', () => {
         // Return the image URL
-        const imageUrl = `/uploads/${uploadStream.id}`;
+        const imageUrl = `${process.env.SERVER}/uploads/${uploadStream.id}`;
         res.status(200).json({ success: true, url: imageUrl }); // Send the URL back to the frontend
       });
       

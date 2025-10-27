@@ -201,9 +201,23 @@ server.post("/upload-banner", upload.single('banner'), (req, res) => {
     uploadStream.end(file.buffer);
 
     uploadStream.on('finish', () => {
-        // Return the image URL - use SERVER env var or construct from request
-        const serverUrl = process.env.SERVER || `${req.protocol}://${req.get('host')}`;
+        // Return the image URL - force production URL if not localhost
+        let serverUrl = process.env.SERVER;
+        
+        // If SERVER env var is not set or contains localhost, use production detection
+        if (!serverUrl || serverUrl.includes('localhost')) {
+            const host = req.get('host');
+            // If host contains render.com or onrender.com, use it; otherwise use env default
+            if (host && (host.includes('render.com') || host.includes('onrender.com'))) {
+                serverUrl = `${req.protocol}://${host}`;
+            } else {
+                // Fallback - you should replace this with your actual Render URL
+                serverUrl = process.env.RENDER_URL || 'https://your-app-name.onrender.com';
+            }
+        }
+        
         const imageUrl = `${serverUrl}/uploads/${uploadStream.id}`;
+        console.log('Generated banner image URL:', imageUrl); // Debug log
         res.status(200).json({ success: true, url: imageUrl }); // Send the URL back to the frontend
       });
       
@@ -255,9 +269,23 @@ server.post("/upload-profile-image", upload.single('profile_images'), (req, res)
     uploadStream.end(file.buffer);
 
     uploadStream.on('finish', () => {
-        // Return the image URL for profile image - use SERVER env var or construct from request
-        const serverUrl = process.env.SERVER || `${req.protocol}://${req.get('host')}`;
+        // Return the image URL for profile image - force production URL if not localhost
+        let serverUrl = process.env.SERVER;
+        
+        // If SERVER env var is not set or contains localhost, use production detection
+        if (!serverUrl || serverUrl.includes('localhost')) {
+            const host = req.get('host');
+            // If host contains render.com or onrender.com, use it; otherwise use env default
+            if (host && (host.includes('render.com') || host.includes('onrender.com'))) {
+                serverUrl = `${req.protocol}://${host}`;
+            } else {
+                // Fallback - you should replace this with your actual Render URL
+                serverUrl = process.env.RENDER_URL || 'https://your-app-name.onrender.com';
+            }
+        }
+        
         const imageUrl = `${serverUrl}/get-profile/${uploadStream.id}`;  // Path to the profile image using 'get-profile'
+        console.log('Generated profile image URL:', imageUrl); // Debug log
         res.status(200).json({ success: true, url: imageUrl });  // Send the URL back to the frontend
     });
   

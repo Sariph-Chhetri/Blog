@@ -24,6 +24,7 @@ const EditProfile = () => {
   let {social_links, personal_info:{fullname, username: profile_username, profile_img, email, bio}} = profile;
 
   useEffect(() => {
+    console.log(import.meta.env.VITE_DOMAIN_SERVER);
     
   axios.post(import.meta.env.VITE_DOMAIN_SERVER + "/get-profile",{username:userAuth.username})
   .then( ( {data})=>{

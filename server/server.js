@@ -201,8 +201,9 @@ server.post("/upload-banner", upload.single('banner'), (req, res) => {
     uploadStream.end(file.buffer);
 
     uploadStream.on('finish', () => {
-        // Return the image URL
-        const imageUrl = `${process.env.SERVER}/uploads/${uploadStream.id}`;
+        // Return the image URL - use SERVER env var or construct from request
+        const serverUrl = process.env.SERVER || `${req.protocol}://${req.get('host')}`;
+        const imageUrl = `${serverUrl}/uploads/${uploadStream.id}`;
         res.status(200).json({ success: true, url: imageUrl }); // Send the URL back to the frontend
       });
       
@@ -254,8 +255,9 @@ server.post("/upload-profile-image", upload.single('profile_images'), (req, res)
     uploadStream.end(file.buffer);
 
     uploadStream.on('finish', () => {
-        // Return the image URL for profile image
-        const imageUrl = `${process.env.SERVER}/get-profile/${uploadStream.id}`;  // Path to the profile image using 'get-profile'
+        // Return the image URL for profile image - use SERVER env var or construct from request
+        const serverUrl = process.env.SERVER || `${req.protocol}://${req.get('host')}`;
+        const imageUrl = `${serverUrl}/get-profile/${uploadStream.id}`;  // Path to the profile image using 'get-profile'
         res.status(200).json({ success: true, url: imageUrl });  // Send the URL back to the frontend
     });
   
